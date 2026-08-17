@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>M3U8 Player + Converter</title>
+  <title>M3U8 Studio</title>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
@@ -13,18 +13,22 @@
 
       <div id="emptyState" class="empty-state">
         <div class="play-icon">▶</div>
-        <h1>M3U8 Player + Converter</h1>
-        <p>Cole uma URL M3U8 na lateral para reproduzir e colocar na fila de conversão.</p>
+        <h1>M3U8 Studio</h1>
+        <p>Cole uma URL M3U8 e adicione à fila.</p>
       </div>
+
+      <!-- Reabre o painel sem alterar o tamanho do player. -->
+      <button id="showSidebar" class="floating-menu" title="Mostrar menu">☰</button>
     </section>
 
-    <aside class="sidebar">
+    <aside id="sidebar" class="sidebar">
       <header class="sidebar-header">
         <div>
           <strong>M3U8 Studio</strong>
           <span>Player & Downloader</span>
         </div>
-        <button id="toggleSidebar" title="Ocultar painel">☰</button>
+
+        <button id="hideSidebar" class="menu-button" title="Ocultar painel">☰</button>
       </header>
 
       <section class="add-box">
@@ -47,17 +51,18 @@
           <span>Fila de vídeos</span>
           <span id="count">0</span>
         </div>
+
         <div id="queue" class="queue"></div>
       </section>
 
       <section class="tools">
         <div class="section-title">Opções</div>
         <button id="clearCompleted">🧹 Limpar concluídos</button>
-        <button id="openCurrent">↗ Abrir vídeo atual</button>
+        <button id="openCurrent">↗ Abrir M3U8 atual</button>
       </section>
 
       <footer>
-        <span>Conversão local com FFmpeg</span>
+        <span>FFmpeg local</span>
         <span id="connection">● conectado</span>
       </footer>
     </aside>

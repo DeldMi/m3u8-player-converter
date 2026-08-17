@@ -5,6 +5,8 @@ const titleInput = document.getElementById("title");
 const queueEl = document.getElementById("queue");
 const countEl = document.getElementById("count");
 const connectionEl = document.getElementById("connection");
+const sidebar = document.getElementById("sidebar");
+const showSidebar = document.getElementById("showSidebar");
 
 let jobs = new Map();
 let currentJob = null;
@@ -12,47 +14,30 @@ let hls = null;
 
 function statusLabel(status) {
   return {
-    queued: "Na fila",
-    downloading: "Baixando",
-    converting: "Convertendo",
-    completed: "Concluído",
-    error: "Erro"
+    queued: "⏳ Na fila",
+    downloading: "📥 Baixando",
+    converting: "⚙️ Convertendo",
+    completed: "✓ Concluído",
+    error: "❌ Erro"
   }[status] || status;
 }
 
-function render() {
-  const list = [...jobs.values()].sort((a, b) => b.createdAt - a.createdAt);
-  countEl.textContent = list.length;
+function formatBytes(bytes) {
+  if (!bytes) return "";
+  const units = ["B", "KB", "MB", "GB"];
+  let value = bytes;
+  let index = 0;
 
-  queueEl.innerHTML = list.map(job => `
-    <article class="job ${currentJob?.id === job.id ? "active" : ""}" data-id="${job.id}">
-      <div class="job-top">
-        <div class="job-title">${escapeHtml(job.title)}</div>
-        <div class="job-status ${job.status === "completed" ? "completed" : ""}">
-          ${statusLabel(job.status)}
-        </div>
-      </div>
-      <div class="progress"><div style="width:${job.progress || 0}%"></div></div>
-      <div class="job-bottom">
-        <small>${job.progress || 0}%</small>
-        ${job.status === "completed"
-          ? `<a class="download" href="${job.output}" download>⬇ Baixar MP4</a>`
-          : `<small>${job.status === "error" ? "Verifique a URL" : "Processando..."}</small>`}
-      </div>
-    </article>
-  `).join("");
+  while (value >= 1024 && index < units.length - 1) {
+    value /= 1024;
+    index++;
+  }
 
-  queueEl.querySelectorAll(".job").forEach(el => {
-    el.addEventListener("click", event => {
-      if (event.target.closest("a")) return;
-      const job = jobs.get(el.dataset.id);
-      if (job) playJob(job);
-    });
-  });
+  return `${value.toFixed(index === 0 ? 0 : 1)} ${units[index]}`;
 }
 
 function escapeHtml(text) {
-  return String(text)
+  return String(text ?? "")
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
@@ -60,13 +45,91 @@ function escapeHtml(text) {
     .replaceAll("'", "&#039;");
 }
 
-function playUrl(url) {
+function render() {
+  const list = [...jobs.values()].sort(
+    (a, b) => b.createdAt - a.createdAt
+  );
+
+  countEl.textContent = list.length;
+
+  queueEl.innerHTML = list.map(job => {
+    const completed = job.status === "completed";
+    const error = job.status === "error";
+
+    return `
+      <article class="job ${currentJob?.id === job.id ? "active" : ""}"
+               data-id="${job.id}">
+
+        <div class="job-top">
+          <div class="job-title">${escapeHtml(job.title)}</div>
+
+          <div class="job-status ${completed ? "completed" : ""} ${error ? "error" : ""}">
+            ${statusLabel(job.status)}
+          </div>
+        </div>
+
+        <div class="progress">
+          <div style="width:${job.progress || 0}%"></div>
+        </div>
+
+        <div class="job-bottom">
+          <small>
+            ${job.progress || 0}%
+            ${job.size ? ` · ${formatBytes(job.size)}` : ""}
+          </small>
+
+          ${
+            completed && job.output
+              ? `<a class="download"
+                    href="${job.output}"
+                    download="${escapeHtml(job.title)}.mp4">
+                    ⬇ Baixar MP4
+                 </a>`
+              : error
+                ? `<small>${escapeHtml(job.error || "Erro")}</small>`
+                : `<small>${job.status === "converting" ? "Convertendo..." : "Processando..."}</small>`
+          }
+        </div>
+      </article>
+    `;
+  }).join("");
+
+  queueEl.querySelectorAll(".job").forEach(el => {
+    el.addEventListener("click", event => {
+      if (event.target.closest("a")) return;
+
+      const job = jobs.get(el.dataset.id);
+      if (job) playJob(job);
+    });
+  });
+}
+
+function playUrl(url, preservePosition = 0, shouldPlay = true) {
   emptyState.style.display = "none";
 
-  // HLS.js é usado em navegadores que não possuem suporte HLS nativo.
   if (hls) {
     hls.destroy();
     hls = null;
+  }
+
+  // MP4 concluído é reproduzido localmente, evitando travamentos do M3U8.
+  if (url.includes("/downloads/") || /\.mp4(?:$|\?)/i.test(url)) {
+    video.src = url;
+    video.load();
+
+    video.addEventListener("loadedmetadata", function restore() {
+      if (preservePosition > 0) {
+        video.currentTime = preservePosition;
+      }
+
+      if (shouldPlay) {
+        video.play().catch(() => {});
+      }
+
+      video.removeEventListener("loadedmetadata", restore);
+    });
+
+    return;
   }
 
   if (video.canPlayType("application/vnd.apple.mpegurl")) {
@@ -74,10 +137,18 @@ function playUrl(url) {
   } else if (window.Hls && Hls.isSupported()) {
     hls = new Hls({
       enableWorker: true,
-      lowLatencyMode: true
+      lowLatencyMode: false,
+      backBufferLength: 30
     });
+
     hls.loadSource(url);
     hls.attachMedia(video);
+
+    hls.on(Hls.Events.ERROR, (_, data) => {
+      if (data.fatal) {
+        console.warn("Erro HLS:", data);
+      }
+    });
   } else {
     alert("Este navegador não suporta reprodução HLS/M3U8.");
     return;
@@ -88,7 +159,13 @@ function playUrl(url) {
 
 function playJob(job) {
   currentJob = job;
-  playUrl(job.url);
+
+  if (job.status === "completed" && job.output) {
+    playUrl(job.output);
+  } else {
+    playUrl(job.url);
+  }
+
   render();
 }
 
@@ -103,7 +180,9 @@ async function addJob() {
 
   const response = await fetch("/api/jobs", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json"
+    },
     body: JSON.stringify({ url, title })
   });
 
@@ -115,10 +194,11 @@ async function addJob() {
   }
 
   jobs.set(data.id, data);
+
+  // Começa pelo M3U8 enquanto o FFmpeg trabalha em segundo plano.
   currentJob = data;
   playUrl(data.url);
 
-  // Limpa apenas os campos para permitir colar rapidamente vários links.
   urlInput.value = "";
   titleInput.value = "";
 
@@ -129,7 +209,12 @@ document.getElementById("addBtn").addEventListener("click", addJob);
 
 document.getElementById("playBtn").addEventListener("click", () => {
   const url = urlInput.value.trim();
-  if (!url) return alert("Cole uma URL M3U8 primeiro.");
+
+  if (!url) {
+    alert("Cole uma URL M3U8 primeiro.");
+    return;
+  }
+
   playUrl(url);
 });
 
@@ -142,21 +227,41 @@ document.getElementById("pasteBtn").addEventListener("click", async () => {
 });
 
 document.getElementById("clearCompleted").addEventListener("click", async () => {
-  const completed = [...jobs.values()].filter(j => j.status === "completed");
+  const completed = [...jobs.values()].filter(
+    job => job.status === "completed"
+  );
+
   for (const job of completed) {
-    await fetch(`/api/jobs/${job.id}`, { method: "DELETE" });
+    await fetch(`/api/jobs/${job.id}`, {
+      method: "DELETE"
+    });
+
     jobs.delete(job.id);
   }
+
   render();
 });
 
 document.getElementById("openCurrent").addEventListener("click", () => {
   if (!currentJob) return;
-  window.open(currentJob.url, "_blank", "noopener");
+
+  window.open(
+    currentJob.url,
+    "_blank",
+    "noopener,noreferrer"
+  );
 });
 
-document.getElementById("toggleSidebar").addEventListener("click", () => {
-  document.body.classList.toggle("sidebar-hidden");
+// A sidebar fica sobreposta ao player, sem mudar sua geometria.
+document.getElementById("hideSidebar").addEventListener("click", () => {
+  sidebar.classList.add("hidden");
+  showSidebar.classList.add("visible");
+});
+
+// Botão flutuante sempre permite reabrir o painel.
+showSidebar.addEventListener("click", () => {
+  sidebar.classList.remove("hidden");
+  showSidebar.classList.remove("visible");
 });
 
 video.addEventListener("loadeddata", () => {
@@ -185,29 +290,53 @@ ws.addEventListener("message", event => {
   }
 
   if (data.type === "job") {
+    const previous = jobs.get(data.job.id);
     jobs.set(data.job.id, data.job);
+
+    // Quando o MP4 termina, troca automaticamente o player para o arquivo local.
+    if (
+      previous &&
+      previous.status !== "completed" &&
+      data.job.status === "completed" &&
+      currentJob?.id === data.job.id
+    ) {
+      const position = video.currentTime || 0;
+      const wasPlaying = !video.paused;
+
+      currentJob = data.job;
+      playUrl(data.job.output, position, wasPlaying);
+    }
+
     render();
     return;
   }
 
   if (data.type === "progress") {
     const job = jobs.get(data.id);
+
     if (job) {
       job.progress = data.progress;
       render();
     }
+
     return;
   }
 
   if (data.type === "removed") {
     jobs.delete(data.id);
+
+    if (currentJob?.id === data.id) {
+      currentJob = null;
+      video.removeAttribute("src");
+      video.load();
+    }
+
     render();
   }
 });
 
-// Carrega a fila inicial caso o WebSocket demore para conectar.
 fetch("/api/jobs")
-  .then(r => r.json())
+  .then(response => response.json())
   .then(list => {
     jobs = new Map(list.map(job => [job.id, job]));
     render();
