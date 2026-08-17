@@ -7,6 +7,10 @@ import { fileURLToPath } from "node:url";
 import crypto from "node:crypto";
 import http from "node:http";
 
+// Caminho absoluto do FFmpeg no Windows.
+// Usamos o caminho completo para não depender do PATH.
+const FFMPEG_PATH = "C:\\ffmpeg\\bin\\ffmpeg.exe";
+
 const __dirname = join(fileURLToPath(import.meta.url), "..");
 const app = express();
 const server = http.createServer(app);
@@ -98,7 +102,7 @@ async function processQueue() {
     output
   ];
 
-  const ff = spawn("ffmpeg", args);
+  const ff = spawn(FFMPEG_PATH, args);
   job.pid = ff.pid;
 
   let stderr = "";
@@ -126,7 +130,8 @@ async function processQueue() {
     }
   });
 
-  ff.on("close", code => {
+  // ff.on("close", code => {
+	ff.on("error", (error) => {
     job.pid = null;
 
     if (code === 0) {
@@ -143,7 +148,7 @@ async function processQueue() {
     job.progress = 0;
     broadcast({ type: "job", job });
 
-    const fallback = spawn("ffmpeg", [
+    const fallback = spawn(FFMPEG_PATH, [
       "-hide_banner",
       "-y",
       "-i", job.url,
