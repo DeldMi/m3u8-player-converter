@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>M3U8 Player + Converter</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main class="app">
+    <section class="player-area">
+      <video id="video" controls playsinline></video>
+
+      <div id="emptyState" class="empty-state">
+        <div class="play-icon">▶</div>
+        <h1>M3U8 Player + Converter</h1>
+        <p>Cole uma URL M3U8 na lateral para reproduzir e colocar na fila de conversão.</p>
+      </div>
+    </section>
+
+    <aside class="sidebar">
+      <header class="sidebar-header">
+        <div>
+          <strong>M3U8 Studio</strong>
+          <span>Player & Downloader</span>
+        </div>
+        <button id="toggleSidebar" title="Ocultar painel">☰</button>
+      </header>
+
+      <section class="add-box">
+        <label for="url">URL M3U8</label>
+        <textarea id="url" rows="3" placeholder="https://servidor.com/video/playlist.m3u8"></textarea>
+
+        <label for="title">Nome do vídeo (opcional)</label>
+        <input id="title" type="text" placeholder="Meu vídeo">
+
+        <div class="actions">
+          <button id="playBtn" class="secondary">▶ Assistir</button>
+          <button id="addBtn" class="primary">＋ Adicionar</button>
+        </div>
+
+        <button id="pasteBtn" class="paste">📋 Colar da área de transferência</button>
+      </section>
+
+      <section class="queue-section">
+        <div class="section-title">
+          <span>Fila de vídeos</span>
+          <span id="count">0</span>
+        </div>
+        <div id="queue" class="queue"></div>
+      </section>
+
+      <section class="tools">
+        <div class="section-title">Opções</div>
+        <button id="clearCompleted">🧹 Limpar concluídos</button>
+        <button id="openCurrent">↗ Abrir vídeo atual</button>
+      </section>
+
+      <footer>
+        <span>Conversão local com FFmpeg</span>
+        <span id="connection">● conectado</span>
+      </footer>
+    </aside>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.6.13/dist/hls.min.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
