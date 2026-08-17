@@ -36,6 +36,7 @@ app.use("/downloads", express.static(OUTPUT_DIR, {
 const jobs = new Map();
 const queue = [];
 let running = false;
+const processes = new Map();
 
 function broadcast(payload) {
   const message = JSON.stringify(payload);
@@ -150,6 +151,7 @@ function processQueue() {
   try {
     ffmpeg = startFfmpeg(remuxArgs);
     job.pid = ffmpeg.pid;
+    processes.set(job.id, ffmpeg);
   } catch (error) {
     job.status = "error";
     job.error = `Não foi possível iniciar o FFmpeg: ${error.message}`;
@@ -200,6 +202,7 @@ function processQueue() {
   });
 
   ffmpeg.on("close", code => {
+    processes.delete(job.id);
     job.pid = null;
 
     if (code === 0 && finishJob(job, output)) {
@@ -232,6 +235,7 @@ function processQueue() {
       ]);
 
       job.pid = converter.pid;
+      processes.set(job.id, converter);
     } catch (error) {
       job.status = "error";
       job.error = `Erro ao iniciar conversão: ${error.message}`;
@@ -282,6 +286,7 @@ function processQueue() {
     });
 
     converter.on("close", code => {
+      processes.delete(job.id);
       job.pid = null;
 
       if (code === 0 && finishJob(job, output)) {
@@ -350,6 +355,47 @@ app.post("/api/jobs", (req, res) => {
   res.status(201).json(job);
 });
 
+
+app.post("/api/jobs/:id/control", (req, res) => {
+  const job = jobs.get(req.params.id);
+  const action = req.body?.action;
+
+  if (!job) return res.status(404).json({ error: "Vídeo não encontrado." });
+
+  if (action === "pause" || action === "resume") {
+    const child = processes.get(job.id);
+    if (!child?.pid) return res.status(409).json({ error: "O processo não está ativo." });
+
+    // Windows não possui SIGSTOP/SIGCONT. Suspend-Process e Resume-Process
+    // permitem pausar/continuar o FFmpeg sem perder o arquivo parcial.
+    const cmd = action === "pause"
+      ? `Suspend-Process -Id ${child.pid}`
+      : `Resume-Process -Id ${child.pid}`;
+
+    spawn("powershell.exe", ["-NoProfile", "-Command", cmd], {
+      windowsHide: true
+    });
+
+    job.status = action === "pause" ? "paused" : "downloading";
+    updateJob(job);
+    return res.json(job);
+  }
+
+  if (action === "cancel") {
+    const child = processes.get(job.id);
+    if (child?.pid) {
+      try { child.kill(); } catch {}
+    }
+    processes.delete(job.id);
+    job.pid = null;
+    job.status = "cancelled";
+    updateJob(job);
+    return res.json(job);
+  }
+
+  return res.status(400).json({ error: "Ação inválida." });
+});
+
 app.delete("/api/jobs/:id", (req, res) => {
   const job = jobs.get(req.params.id);
 
@@ -357,12 +403,11 @@ app.delete("/api/jobs/:id", (req, res) => {
     return res.sendStatus(404);
   }
 
-  if (job.pid) {
-    try {
-      process.kill(job.pid);
-    } catch {}
+  const child = processes.get(job.id);
+  if (child?.pid) {
+    try { child.kill(); } catch {}
   }
-
+  processes.delete(job.id);
   jobs.delete(job.id);
   broadcast({
     type: "removed",

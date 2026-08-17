@@ -11,12 +11,17 @@ const showSidebar = document.getElementById("showSidebar");
 let jobs = new Map();
 let currentJob = null;
 let hls = null;
+let sortMode = "added";
+let autoNext = false;
+const notifiedJobs = new Set();
 
 function statusLabel(status) {
   return {
     queued: "⏳ Na fila",
     downloading: "📥 Baixando",
     converting: "⚙️ Convertendo",
+    paused: "⏸ Pausado",
+    cancelled: "🚫 Cancelado",
     completed: "✓ Concluído",
     error: "❌ Erro"
   }[status] || status;
@@ -46,62 +51,109 @@ function escapeHtml(text) {
 }
 
 function render() {
-  const list = [...jobs.values()].sort(
-    (a, b) => b.createdAt - a.createdAt
-  );
+  let list = [...jobs.values()];
+
+  if (sortMode === "alpha") {
+    list.sort((a,b) => a.title.localeCompare(b.title, "pt-BR"));
+  } else if (sortMode === "alphaDesc") {
+    list.sort((a,b) => b.title.localeCompare(a.title, "pt-BR"));
+  } else if (sortMode === "status") {
+    list.sort((a,b) => a.status.localeCompare(b.status));
+  } else {
+    list.sort((a,b) => a.createdAt - b.createdAt);
+  }
 
   countEl.textContent = list.length;
 
   queueEl.innerHTML = list.map(job => {
     const completed = job.status === "completed";
     const error = job.status === "error";
+    const processing = ["downloading","converting","paused"].includes(job.status);
+
+    let controls = "";
+    if (job.status === "downloading" || job.status === "converting") {
+      controls += `<button class="job-action" data-action="pause">⏸ Pausar</button>`;
+    }
+    if (job.status === "paused") {
+      controls += `<button class="job-action" data-action="resume">▶ Continuar</button>`;
+    }
+    if (processing) {
+      controls += `<button class="job-action danger" data-action="cancel">✕ Cancelar</button>`;
+    }
+    controls += `<button class="job-action danger" data-action="delete">🗑 Excluir</button>`;
 
     return `
-      <article class="job ${currentJob?.id === job.id ? "active" : ""}"
-               data-id="${job.id}">
-
+      <article class="job ${currentJob?.id === job.id ? "active" : ""}" data-id="${job.id}">
         <div class="job-top">
           <div class="job-title">${escapeHtml(job.title)}</div>
-
           <div class="job-status ${completed ? "completed" : ""} ${error ? "error" : ""}">
             ${statusLabel(job.status)}
           </div>
         </div>
-
-        <div class="progress">
-          <div style="width:${job.progress || 0}%"></div>
-        </div>
-
+        <div class="progress"><div style="width:${job.progress || 0}%"></div></div>
         <div class="job-bottom">
-          <small>
-            ${job.progress || 0}%
-            ${job.size ? ` · ${formatBytes(job.size)}` : ""}
-          </small>
-
+          <small>${job.progress || 0}%${job.size ? ` · ${formatBytes(job.size)}` : ""}</small>
           ${
             completed && job.output
-              ? `<a class="download"
-                    href="${job.output}"
-                    download="${escapeHtml(job.title)}.mp4">
-                    ⬇ Baixar MP4
-                 </a>`
+              ? `<a class="download" href="${job.output}" download="${escapeHtml(job.title)}.mp4">⬇ Baixar MP4</a>`
               : error
                 ? `<small>${escapeHtml(job.error || "Erro")}</small>`
-                : `<small>${job.status === "converting" ? "Convertendo..." : "Processando..."}</small>`
+                : `<small>${job.status === "paused" ? "Pausado" : "Processando..."}</small>`
           }
         </div>
-      </article>
-    `;
+        <div class="job-actions">${controls}</div>
+      </article>`;
   }).join("");
 
   queueEl.querySelectorAll(".job").forEach(el => {
     el.addEventListener("click", event => {
-      if (event.target.closest("a")) return;
-
+      if (event.target.closest(".download")) return;
       const job = jobs.get(el.dataset.id);
-      if (job) playJob(job);
+      if (!job) return;
+
+      const action = event.target.closest("[data-action]")?.dataset.action;
+      if (action) {
+        event.stopPropagation();
+        controlJob(job, action);
+      } else {
+        // Somente esta ação explícita troca o vídeo em reprodução.
+        playJob(job);
+      }
     });
   });
+}
+
+async function controlJob(job, action) {
+  if (action === "delete") {
+    await fetch(`/api/jobs/${job.id}`, { method: "DELETE" });
+    jobs.delete(job.id);
+
+    if (currentJob?.id === job.id) {
+      currentJob = null;
+      video.pause();
+      if (hls) { hls.destroy(); hls = null; }
+      video.removeAttribute("src");
+      video.load();
+      emptyState.style.display = "block";
+    }
+    render();
+    return;
+  }
+
+  const response = await fetch(`/api/jobs/${job.id}/control`, {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ action })
+  });
+  const data = await response.json();
+
+  if (!response.ok) {
+    alert(data.error || "Não foi possível controlar o vídeo.");
+    return;
+  }
+
+  jobs.set(data.id, data);
+  render();
 }
 
 function playUrl(url, preservePosition = 0, shouldPlay = true) {
@@ -196,8 +248,11 @@ async function addJob() {
   jobs.set(data.id, data);
 
   // Começa pelo M3U8 enquanto o FFmpeg trabalha em segundo plano.
-  currentJob = data;
-  playUrl(data.url);
+  // Adicionar à fila não interrompe o vídeo que já está sendo assistido.
+  if (!currentJob) {
+    currentJob = data;
+    playUrl(data.url);
+  }
 
   urlInput.value = "";
   titleInput.value = "";
@@ -268,6 +323,52 @@ video.addEventListener("loadeddata", () => {
   emptyState.style.display = "none";
 });
 
+
+document.getElementById("sortMode").addEventListener("change", event => {
+  sortMode = event.target.value;
+  render();
+});
+
+document.getElementById("autoNext").addEventListener("change", event => {
+  autoNext = event.target.checked;
+});
+
+function showCompletedToast(job) {
+  if (notifiedJobs.has(job.id)) return;
+  notifiedJobs.add(job.id);
+
+  const box = document.getElementById("notifications");
+  const toast = document.createElement("div");
+  toast.className = "toast";
+  toast.innerHTML = `
+    <button class="toast-close" title="Fechar">×</button>
+    <strong>✓ Conversão concluída</strong>
+    <span>${escapeHtml(job.title)}</span>
+    <div class="toast-timer"></div>
+  `;
+  box.prepend(toast);
+
+  const timer = setTimeout(() => toast.remove(), 8000);
+  toast.querySelector(".toast-close").addEventListener("click", () => {
+    clearTimeout(timer);
+    toast.remove();
+  });
+}
+
+function playNextInQueue() {
+  let list = [...jobs.values()].filter(j => j.status === "completed" && j.output);
+  if (sortMode === "alpha") list.sort((a,b)=>a.title.localeCompare(b.title,"pt-BR"));
+  else if (sortMode === "alphaDesc") list.sort((a,b)=>b.title.localeCompare(a.title,"pt-BR"));
+  else list.sort((a,b)=>a.createdAt-b.createdAt);
+
+  const i = list.findIndex(j => j.id === currentJob?.id);
+  if (i >= 0 && list[i+1]) playJob(list[i+1]);
+}
+
+video.addEventListener("ended", () => {
+  if (autoNext) playNextInQueue();
+});
+
 const wsProtocol = location.protocol === "https:" ? "wss:" : "ws:";
 const ws = new WebSocket(`${wsProtocol}//${location.host}`);
 
@@ -297,14 +398,16 @@ ws.addEventListener("message", event => {
     if (
       previous &&
       previous.status !== "completed" &&
-      data.job.status === "completed" &&
-      currentJob?.id === data.job.id
+      data.job.status === "completed"
     ) {
-      const position = video.currentTime || 0;
-      const wasPlaying = !video.paused;
+      showCompletedToast(data.job);
 
-      currentJob = data.job;
-      playUrl(data.job.output, position, wasPlaying);
+      if (currentJob?.id === data.job.id) {
+        const position = video.currentTime || 0;
+        const wasPlaying = !video.paused;
+        currentJob = data.job;
+        playUrl(data.job.output, position, wasPlaying);
+      }
     }
 
     render();

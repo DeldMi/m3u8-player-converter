@@ -52,6 +52,18 @@
           <span id="count">0</span>
         </div>
 
+        <select id="sortMode" class="sort-select" title="Ordenar fila">
+          <option value="added">Ordem adicionada</option>
+          <option value="alpha">A → Z</option>
+          <option value="alphaDesc">Z → A</option>
+          <option value="status">Status</option>
+        </select>
+
+        <label class="auto-next">
+          <input id="autoNext" type="checkbox">
+          Reproduzir fila automaticamente
+        </label>
+
         <div id="queue" class="queue"></div>
       </section>
 
@@ -66,6 +78,7 @@
         <span id="connection">● conectado</span>
       </footer>
     </aside>
+    <div id="notifications" class="notifications" aria-live="polite"></div>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/hls.js@1.6.13/dist/hls.min.js"></script>

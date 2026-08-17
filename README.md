@@ -96,3 +96,16 @@ Durante o processamento, o player usa o M3U8. Assim que o MP4 termina e é valid
 
 Isso evita depender continuamente do servidor M3U8 depois que o vídeo já foi baixado.
 
+## M3U8 Studio v3
+
+Inclui:
+- Pausar e continuar o FFmpeg.
+- Cancelar e excluir tarefas.
+- Adicionar novos links sem interromper o vídeo atual.
+- Assistir imediatamente somente pelo botão Assistir ou clicando em um vídeo da fila.
+- Ordenação por ordem adicionada, A→Z, Z→A e status.
+- Reprodução automática da fila.
+- Notificação de conversão concluída no canto superior direito.
+- Notificações empilhadas, com X para fechar.
+- Barra inferior mostrando o tempo restante para fechamento automático.
+- MP4 concluído disponível para reprodução local e download pelo navegador.
