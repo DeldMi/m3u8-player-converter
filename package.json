@@ -5,10 +5,16 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "build": "npm install && npm install express ws nodemon",
+    "build:dev": "npm install && npm install express ws nodemon --save-dev",
+    "start:dev": "nodemon server.js"
   },
   "dependencies": {
     "express": "^5.1.0",
     "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
   }
 }
