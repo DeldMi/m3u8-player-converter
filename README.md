@@ -1,111 +1,41 @@
-# M3U8 Player + Converter
+# M3U8 Player + Converter (M3U8 Studio v3)
 
-Aplicação web local para:
+O **M3U8 Player + Converter** é uma aplicação web local focada em reprodução eficiente de streams HLS e conversão automatizada para MP4. Desenvolvido para facilitar o gerenciamento de filas, permite assistir, converter e baixar vídeos de forma intuitiva.
 
-- reproduzir URLs `.m3u8` em tela grande;
-- adicionar vários links a uma fila;
-- continuar adicionando links enquanto outro vídeo está sendo processado;
-- baixar/converter M3U8 para MP4 usando FFmpeg;
-- mostrar progresso;
-- disponibilizar o MP4 automaticamente quando terminar;
-- usar HLS.js para reprodução no navegador.
+---
 
-## Requisitos
+## 📑 Documentação e Políticas
+Para garantir transparência e conformidade, consulte os documentos abaixo:
 
-- Node.js 18 ou superior
-- FFmpeg instalado e disponível no `PATH`
+* [📄 Licença (LICENSE.md)](LICENSE.md) - Detalhes sobre o uso e distribuição.
+* [🛡️ Política de Segurança (SECURITY.md)](SECURITY.md) - Como relatar vulnerabilidades.
+* [🔒 Privacidade e Responsabilidade (PRIVACY.md)](PRIVACY.md) - Termos de uso e privacidade.
 
-### Ubuntu / WSL
+---
 
-```bash
-sudo apt update
-sudo apt install -y ffmpeg
-```
+## 🚀 Funcionalidades Principais
 
-### Windows
+* **Reprodução:** HLS.js integrado para visualização fluida de URLs `.m3u8`.
+* **Gerenciamento de Fila:** Adição de múltiplos links sem interromper o vídeo atual.
+* **Conversão Inteligente:** FFmpeg com tentativa de remux (cópia de stream) ou transcodificação (H.264 + AAC).
+* **Automação:** Troca automática do player de M3U8 para MP4 local ao concluir o download.
+* **Interface Moderna:** Sidebar sobreposta, notificações em tempo real e ordenação de fila (A-Z, Z-A, Status).
 
-Instale o FFmpeg e coloque a pasta `bin` no PATH do Windows.
+---
 
-## Instalação
+## ⚙️ Pré-requisitos
 
-```bash
-npm install
-npm start
-```
+* **Node.js:** Versão 18 ou superior.
+* **FFmpeg:** Instalado e configurado no `PATH`.
+    * *Ubuntu/WSL:* `sudo apt install -y ffmpeg`
+    * *Windows:* Certifique-se de que o executável esteja em `C:\ffmpeg\bin\ffmpeg.exe` (ou ajuste no código).
 
-Depois abra:
+---
 
-http://localhost:3000
+## 📥 Instalação e Execução
 
-## Como funciona
-
-O navegador reproduz o M3U8 diretamente com HLS.js.
-
-Ao clicar em **Adicionar**, o servidor coloca o link na fila. O FFmpeg tenta primeiro fazer **remux** (copiar os codecs sem recodificar). Se isso não funcionar, ele tenta transcodificar para H.264 + AAC.
-
-Os arquivos concluídos ficam na pasta:
-
-`downloads/`
-
-## Observações importantes
-
-1. Alguns servidores M3U8 exigem cookies, Referer, User-Agent ou autenticação. Esta versão não implementa esses cabeçalhos.
-2. Alguns streams são protegidos por DRM; nesses casos o FFmpeg não deve ser usado para contornar a proteção.
-3. Para publicar esta aplicação na internet, adicione autenticação e uma política de URLs permitidas. Aceitar URLs arbitrárias em um servidor público pode criar risco de SSRF.
-4. O player no navegador pode funcionar mesmo quando o FFmpeg não consegue acessar o mesmo stream, por diferenças de CORS, headers ou autenticação.
-
-Versão corrigida para Windows 10.
-
-## Principais correções
-
-- FFmpeg configurado em `C:\ffmpeg\bin\ffmpeg.exe`.
-- Tratamento do erro `spawn ffmpeg ENOENT`.
-- O servidor não cai quando o FFmpeg não consegue iniciar.
-- Progresso deixa de ficar preso em 99%.
-- Quando o arquivo realmente existe, o estado muda para `✓ Concluído`.
-- O botão `⬇ Baixar MP4` aparece ao lado do vídeo.
-- Vídeo concluído passa a ser reproduzido pelo MP4 local.
-- Quando o download termina, o player troca automaticamente do M3U8 para o MP4.
-- Sidebar virou painel sobreposto e não redimensiona o player.
-- Ao fechar a sidebar, aparece um botão flutuante para reabri-la.
-- A fila continua trabalhando em segundo plano.
-
-## Executar
-
-No CMD:
-
+### No Windows (CMD/PowerShell)
 ```cmd
-cd /d D:\Users\Felip\Videos\Descomprica\m3u8-player-converter
+cd /d C:\www\m3u8-player-converter
 npm install
 npm start
-```
-
-Depois abra:
-
-http://localhost:3000
-
-## FFmpeg
-
-O projeto usa:
-
-`C:\ffmpeg\bin\ffmpeg.exe`
-
-## Observação
-
-Durante o processamento, o player usa o M3U8. Assim que o MP4 termina e é validado, o player muda automaticamente para o arquivo local.
-
-Isso evita depender continuamente do servidor M3U8 depois que o vídeo já foi baixado.
-
-## M3U8 Studio v3
-
-Inclui:
-- Pausar e continuar o FFmpeg.
-- Cancelar e excluir tarefas.
-- Adicionar novos links sem interromper o vídeo atual.
-- Assistir imediatamente somente pelo botão Assistir ou clicando em um vídeo da fila.
-- Ordenação por ordem adicionada, A→Z, Z→A e status.
-- Reprodução automática da fila.
-- Notificação de conversão concluída no canto superior direito.
-- Notificações empilhadas, com X para fechar.
-- Barra inferior mostrando o tempo restante para fechamento automático.
-- MP4 concluído disponível para reprodução local e download pelo navegador.
