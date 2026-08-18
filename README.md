@@ -36,6 +36,6 @@ Para garantir transparência e conformidade, consulte os documentos abaixo:
 
 ### No Windows (CMD/PowerShell)
 ```cmd
-cd /d D:\Users\Felip\Videos\Descomprica\m3u8-player-converter
+cd /d D:\www\m3u8-player-converter
 npm install
 npm start
