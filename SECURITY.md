@@ -6,7 +6,7 @@ Levamos a segurança do `m3u8-player-converter` a sério. Esta política descrev
 
 Se você encontrar um problema de segurança ou uma vulnerabilidade potencial, solicitamos que não a torne pública. Em vez disso, entre em contato diretamente comigo:
 
-* **E-mail de Contato:** [Insira seu e-mail aqui]
+* **E-mail de Contato:** [Email](andre@a3gs.com.br)
 * **Assunto do E-mail:** "Segurança: Vulnerabilidade em m3u8-player-converter"
 
 ### O que incluir no seu relatório:
