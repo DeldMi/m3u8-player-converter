@@ -6,6 +6,9 @@ import { join, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import crypto from "node:crypto";
 import http from "node:http";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const __dirname = join(fileURLToPath(import.meta.url), "..");
 const app = express();
@@ -13,10 +16,11 @@ const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
 const PORT = process.env.PORT || 3000;
-const OUTPUT_DIR = join(__dirname, "downloads");
+const LOCAL = process.env.LOCAL || "localhost";
+const OUTPUT_DIR = join(__dirname, process.env.OUTPUT_DIR || "downloads");
 
 // Caminho confirmado no Windows do usuário.
-const FFMPEG_PATH = "C:\\ffmpeg\\bin\\ffmpeg.exe";
+const FFMPEG_PATH = process.env.FFMPEG_PATH
 
 if (!existsSync(OUTPUT_DIR)) {
   mkdirSync(OUTPUT_DIR, { recursive: true });
@@ -424,7 +428,7 @@ wss.on("connection", ws => {
   }));
 });
 
-server.listen(PORT, () => {
-  console.log(`M3U8 Studio: http://localhost:${PORT}`);
+server.listen(PORT, LOCAL, () => {
+  console.log(`M3U8 Studio: http://${LOCAL}:${PORT}`);
   console.log(`FFmpeg: ${FFMPEG_PATH}`);
 });
